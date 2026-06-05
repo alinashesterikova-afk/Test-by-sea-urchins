@@ -42,7 +42,7 @@ function scrubFromClientX(clientX) {
   renderScrubber(value);
 }
 
-const videoCandidates = ["Video.mp4", "Video.webm", "Video.mov", "Video.m4v", "Video.ogv", "Video.ogg"];
+const videoCandidates = ["video.mp4", "video.webm", "video.mov", "video.m4v", "video.ogv", "video.ogg", "Video.mp4", "Video.webm", "Video.mov", "Video.m4v", "Video.ogv", "Video.ogg"];
 
 function fileUrl(name) {
   return new URL(name, window.location.href).href;
