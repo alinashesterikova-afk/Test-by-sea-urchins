@@ -1,3 +1,5 @@
+import { PROJECTS, buildDashboard, buildProjectPage, getSuggestionPool } from "./shared-data.js";
+
 const state = {
   period: "1y",
   compareLeft: true,
@@ -590,8 +592,8 @@ async function loadAnalytics() {
     renderAnalytics(data);
   } catch (error) {
     if (token !== state.analyticsToken) return;
-    console.error(error);
     state.loadingAnalytics = false;
+    renderAnalytics(buildDashboard(state.period, true, state.ownerEmail, PROJECTS));
   }
 }
 
@@ -618,20 +620,22 @@ async function loadProjects() {
   } catch (error) {
     if (token !== state.projectToken) return;
     state.loadingProjects = false;
-    state.error = error;
-    elements.errorBanner.hidden = false;
-    elements.tableBody.innerHTML = "";
-    renderPagination(0);
+    const fallback = buildProjectPage({
+      page: state.page,
+      perPage: state.perPage,
+      ownerEmail: state.ownerEmail,
+      period: state.period,
+      projects: PROJECTS,
+    });
+    state.total = fallback.total;
+    state.items = fallback.items;
+    renderRows(fallback);
+    renderPagination(fallback.total);
   }
 }
 
 async function loadSuggestionPool() {
-  try {
-    const data = await fetchJson(`/api/projects?${buildQuery({ page: 1, per_page: 2000 })}`);
-    state.suggestionPool = Array.from(new Set(data.items.map((item) => item.ownerEmail))).sort();
-  } catch {
-    state.suggestionPool = [];
-  }
+  state.suggestionPool = getSuggestionPool(PROJECTS);
 }
 
 function refreshAll({ resetPage = false } = {}) {
@@ -706,7 +710,13 @@ elements.exportButton.addEventListener("click", async () => {
       per_page: state.perPage,
       owner_email: state.ownerEmail,
       period: state.period,
-    })}`);
+    })}`).catch(() => buildProjectPage({
+      page: state.page,
+      perPage: state.perPage,
+      ownerEmail: state.ownerEmail,
+      period: state.period,
+      projects: PROJECTS,
+    }));
     const csv = buildCsv(data.items);
     const dates = data.items.map((item) => item.created).sort();
     const from = dates[0] ?? "0000-00-00";
