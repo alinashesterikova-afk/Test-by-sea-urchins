@@ -28,6 +28,12 @@ function startOfDay(date) {
   return out;
 }
 
+function endOfDay(date) {
+  const out = new Date(date);
+  out.setHours(23, 59, 59, 999);
+  return out;
+}
+
 function addDays(date, days) {
   const out = new Date(date);
   out.setDate(out.getDate() + days);
@@ -138,7 +144,7 @@ function pickPeriodConfig(period) {
 
 export function parsePeriodRange(period) {
   const config = pickPeriodConfig(period);
-  const end = startOfDay(new Date());
+  const end = endOfDay(new Date());
   if (config.mode === "month") {
     return {
       config,
@@ -151,7 +157,7 @@ export function parsePeriodRange(period) {
     return {
       config,
       start: startOfDay(end),
-      end,
+      end: endOfDay(end),
     };
   }
 
@@ -164,7 +170,7 @@ export function parsePeriodRange(period) {
 
 function bucketLabelsFor(config, end) {
   if (config.mode === "hour") {
-    return Array.from({ length: 24 }, (_, hour) => `${hour.toString().padStart(2, "0")}:00`);
+    return Array.from({ length: 24 }, (_, hour) => `${hour.toString().padStart(2, "0")}`);
   }
 
   if (config.mode === "month") {

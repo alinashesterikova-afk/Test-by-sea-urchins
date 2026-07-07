@@ -466,6 +466,16 @@ button {
   display: block;
 }
 
+.chart-body svg text {
+  fill: #727a75;
+  font-size: 11px;
+  font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
+}
+
+.chart-body svg text.axis-label {
+  fill: #3d433f;
+}
+
 .table-panel {
   background: rgba(255, 255, 255, 0.86);
   backdrop-filter: blur(10px);

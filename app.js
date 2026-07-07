@@ -1,4 +1,4 @@
-import { PROJECTS, buildDashboard, buildProjectPage, getSuggestionPool } from "./shared-data.js?v=2";
+import { PROJECTS, buildDashboard, buildProjectPage, getSuggestionPool } from "./shared-data.js?v=3";
 
 const state = {
   period: "1y",
@@ -181,6 +181,19 @@ function buildSparkline(data, { color = "#5ada6d", fill = "rgba(90,218,109,0.16)
   `;
 }
 
+function renderXLabels(labels, positionForIndex, y, maxLabels = 8) {
+  if (!labels.length) return "";
+  const stride = Math.max(1, Math.ceil(labels.length / maxLabels));
+  return labels
+    .map((label, index) => {
+      const shouldShow = index === 0 || index === labels.length - 1 || index % stride === 0;
+      if (!shouldShow) return "";
+      const x = positionForIndex(index);
+      return `<text x="${x}" y="${y}" text-anchor="middle" class="axis-label">${escapeHtml(label)}</text>`;
+    })
+    .join("");
+}
+
 function buildLineChart(series, compareSeries, labels, compareEnabled) {
   const width = 560;
   const height = 260;
@@ -222,12 +235,7 @@ function buildLineChart(series, compareSeries, labels, compareEnabled) {
     [1.0, String(Math.round(maxValue))],
   ];
 
-  const labelsBottom = labels
-    .map((label, index) => {
-      const x = pad.left + index * xStep;
-      return `<text x="${x}" y="${height - 12}" text-anchor="middle">${escapeHtml(label)}</text>`;
-    })
-    .join("");
+  const labelsBottom = renderXLabels(labels, (index) => pad.left + index * xStep, height - 12, 8);
 
   const comparePath = compareEnabled ? makePath(compareSeries) : "";
   const compareArea = compareEnabled ? makeArea(compareSeries) : "";
@@ -296,12 +304,7 @@ function buildBarChart(series, compareSeries, labels, compareEnabled) {
         .join("")
     : "";
 
-  const labelsBottom = labels
-    .map((label, index) => {
-      const x = pad.left + index * groupStep + groupStep / 2;
-      return `<text x="${x}" y="${height - 12}" text-anchor="middle">${escapeHtml(label)}</text>`;
-    })
-    .join("");
+  const labelsBottom = renderXLabels(labels, (index) => pad.left + index * groupStep + groupStep / 2, height - 12, 8);
 
   return `
     <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Bar chart">
