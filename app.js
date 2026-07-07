@@ -1,6 +1,7 @@
 const state = {
   period: "1y",
-  compare: true,
+  compareLeft: true,
+  compareRight: true,
   page: 1,
   perPage: 100,
   ownerEmail: "",
@@ -151,7 +152,7 @@ function renderEmptyState() {
       state.ownerEmail = "";
       state.page = 1;
       hideSuggestions();
-      loadProjects();
+      refreshAll({ resetPage: true });
     });
   }
 }
@@ -378,7 +379,7 @@ function renderAnalytics(analytics) {
     analytics.charts.left.series,
     analytics.charts.left.compareSeries,
     analytics.charts.left.labels,
-    state.compare,
+    state.compareLeft,
   );
 
   elements.rightChartValue.textContent = analytics.charts.right.value;
@@ -392,11 +393,11 @@ function renderAnalytics(analytics) {
     analytics.charts.right.series,
     analytics.charts.right.compareSeries,
     analytics.charts.right.labels,
-    state.compare,
+    state.compareRight,
   );
 
-  elements.leftCompareToggle.classList.toggle("on", state.compare);
-  elements.rightCompareToggle.classList.toggle("on", state.compare);
+  elements.leftCompareToggle.classList.toggle("on", state.compareLeft);
+  elements.rightCompareToggle.classList.toggle("on", state.compareRight);
 }
 
 function renderSkeletonProjects() {
@@ -580,7 +581,10 @@ async function loadAnalytics() {
   const token = ++state.analyticsToken;
   state.loadingAnalytics = true;
   try {
-    const data = await fetchJson(`/api/analytics?${buildQuery({ period: state.period, compare: state.compare ? 1 : 0 })}`);
+    const data = await fetchJson(`/api/analytics?${buildQuery({
+      period: state.period,
+      owner_email: state.ownerEmail,
+    })}`);
     if (token !== state.analyticsToken) return;
     state.loadingAnalytics = false;
     renderAnalytics(data);
@@ -603,6 +607,7 @@ async function loadProjects() {
       page: state.page,
       per_page: state.perPage,
       owner_email: state.ownerEmail,
+      period: state.period,
     })}`);
     if (token !== state.projectToken) return;
     state.loadingProjects = false;
@@ -629,6 +634,12 @@ async function loadSuggestionPool() {
   }
 }
 
+function refreshAll({ resetPage = false } = {}) {
+  if (resetPage) state.page = 1;
+  loadAnalytics();
+  loadProjects();
+}
+
 function syncPeriodButtons() {
   periodButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.period === state.period);
@@ -647,7 +658,10 @@ elements.ownerSearch.addEventListener("input", () => {
   state.ownerEmail = elements.ownerSearch.value.trim();
   state.suggestionIndex = -1;
   renderSuggestions();
-  debounceProjects();
+  window.clearTimeout(state.filterTimer);
+  state.filterTimer = window.setTimeout(() => {
+    refreshAll({ resetPage: true });
+  }, 300);
 });
 
 elements.ownerSearch.addEventListener("focus", renderSuggestions);
@@ -681,14 +695,18 @@ elements.suggestions.addEventListener("click", (event) => {
   if (!button) return;
   elements.ownerSearch.value = button.dataset.email || "";
   state.ownerEmail = elements.ownerSearch.value.trim();
-  state.page = 1;
   hideSuggestions();
-  loadProjects();
+  refreshAll({ resetPage: true });
 });
 
 elements.exportButton.addEventListener("click", async () => {
   try {
-    const data = await fetchJson(`/api/projects?${buildQuery({ page: state.page, per_page: state.perPage, owner_email: state.ownerEmail })}`);
+    const data = await fetchJson(`/api/projects?${buildQuery({
+      page: state.page,
+      per_page: state.perPage,
+      owner_email: state.ownerEmail,
+      period: state.period,
+    })}`);
     const csv = buildCsv(data.items);
     const dates = data.items.map((item) => item.created).sort();
     const from = dates[0] ?? "0000-00-00";
@@ -711,8 +729,7 @@ elements.retryButton.addEventListener("click", loadProjects);
 
 elements.perPage.addEventListener("change", () => {
   state.perPage = Number(elements.perPage.value);
-  state.page = 1;
-  loadProjects();
+  refreshAll({ resetPage: true });
 });
 
 elements.prevPage.addEventListener("click", () => {
@@ -777,22 +794,20 @@ elements.productsDialog.addEventListener("close", () => {
 });
 
 elements.leftCompareControl.addEventListener("click", () => {
-  state.compare = !state.compare;
-  syncPeriodButtons();
-  loadAnalytics();
+  state.compareLeft = !state.compareLeft;
+  if (state.analytics) renderAnalytics(state.analytics);
 });
 
 elements.rightCompareControl.addEventListener("click", () => {
-  state.compare = !state.compare;
-  syncPeriodButtons();
-  loadAnalytics();
+  state.compareRight = !state.compareRight;
+  if (state.analytics) renderAnalytics(state.analytics);
 });
 
 periodButtons.forEach((button) => {
   button.addEventListener("click", () => {
     state.period = button.dataset.period;
     syncPeriodButtons();
-    loadAnalytics();
+    refreshAll({ resetPage: true });
   });
 });
 
@@ -832,8 +847,7 @@ window.addEventListener("resize", () => {
 
 syncPeriodButtons();
 loadSuggestionPool().then(() => {
-  loadProjects();
-  loadAnalytics();
+  refreshAll();
 });
 
 function buildCsv(rows) {

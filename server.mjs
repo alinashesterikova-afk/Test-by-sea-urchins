@@ -167,6 +167,32 @@ function pickPeriodConfig(period) {
   return configs[period] ?? configs["1y"];
 }
 
+function parsePeriodRange(period) {
+  const config = pickPeriodConfig(period);
+  const end = startOfDay(new Date());
+  if (config.mode === "month") {
+    return {
+      config,
+      start: new Date(end.getFullYear(), 0, 1),
+      end,
+    };
+  }
+
+  if (config.mode === "hour") {
+    return {
+      config,
+      start: startOfDay(end),
+      end,
+    };
+  }
+
+  return {
+    config,
+    start: addDays(startOfDay(end), -(config.durationDays - 1)),
+    end,
+  };
+}
+
 function bucketLabelsFor(config, end) {
   if (config.mode === "hour") {
     return Array.from({ length: 24 }, (_, hour) => `${hour.toString().padStart(2, "0")}:00`);
@@ -250,21 +276,23 @@ function buildSeries(items, config, end) {
   return { labels, buckets };
 }
 
-function buildDashboard(period, compare) {
-  const config = pickPeriodConfig(period);
-  const end = startOfDay(new Date());
-  const currentStart = config.mode === "month" ? new Date(end.getFullYear(), 0, 1) : addDays(end, -(config.durationDays - 1));
+function buildDashboard(period, compare, ownerEmail = "") {
+  const { config, start: currentStart, end } = parsePeriodRange(period);
   const previousEnd = addDays(currentStart, -1);
   const previousStart = config.mode === "month" ? new Date(previousEnd.getFullYear() - 1, 0, 1) : addDays(previousEnd, -(config.durationDays - 1));
+  const ownerNeedle = ownerEmail.trim().toLowerCase();
+  const ownerMatches = ownerNeedle
+    ? (item) => item.ownerEmail.toLowerCase().includes(ownerNeedle)
+    : () => true;
 
   const currentItems = PROJECTS.filter((project) => {
     const created = new Date(project.createdAt);
-    return created >= currentStart && created <= end;
+    return created >= currentStart && created <= end && ownerMatches(project);
   });
 
   const previousItems = PROJECTS.filter((project) => {
     const created = new Date(project.createdAt);
-    return created >= previousStart && created <= previousEnd;
+    return created >= previousStart && created <= previousEnd && ownerMatches(project);
   });
 
   const currentSeries = buildSeries(currentItems, config, end);
@@ -441,12 +469,16 @@ const server = http.createServer((req, res) => {
     const page = Math.max(1, Number(url.searchParams.get("page") || 1));
     const perPage = Math.max(1, Math.min(totalProjects, Number(url.searchParams.get("per_page") || 100)));
     const ownerEmail = (url.searchParams.get("owner_email") || "").trim().toLowerCase();
-    const filtered = ownerEmail
-      ? PROJECTS.filter((project) => project.ownerEmail.toLowerCase().includes(ownerEmail))
-      : PROJECTS;
+    const period = url.searchParams.get("period") || "1y";
+    const { start: periodStart, end: periodEnd } = parsePeriodRange(period);
+    const filtered = PROJECTS.filter((project) => {
+      const created = new Date(project.createdAt);
+      const ownerOk = ownerEmail ? project.ownerEmail.toLowerCase().includes(ownerEmail) : true;
+      return ownerOk && created >= periodStart && created <= periodEnd;
+    });
     const total = filtered.length;
-    const start = (page - 1) * perPage;
-    const items = filtered.slice(start, start + perPage);
+    const sliceStart = (page - 1) * perPage;
+    const items = filtered.slice(sliceStart, sliceStart + perPage);
     json(res, 200, { page, per_page: perPage, total, items });
     return;
   }
@@ -454,7 +486,8 @@ const server = http.createServer((req, res) => {
   if (url.pathname === "/api/analytics") {
     const period = url.searchParams.get("period") || "1y";
     const compare = url.searchParams.get("compare") !== "0";
-    json(res, 200, buildDashboard(period, compare));
+    const ownerEmail = (url.searchParams.get("owner_email") || "").trim();
+    json(res, 200, buildDashboard(period, compare, ownerEmail));
     return;
   }
 

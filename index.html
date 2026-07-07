@@ -7,26 +7,27 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header class="topbar">
-      <div class="topbar-brand" aria-hidden="true">
-        <div class="brand-mark">5d</div>
-      </div>
-      <nav class="topnav" aria-label="Primary">
-        <a href="#" class="topnav-link">Product List</a>
-        <a href="#" class="topnav-link">Library</a>
-        <a href="#" class="topnav-link">Set Builder</a>
-        <a href="#" class="topnav-link active">Analytics</a>
-      </nav>
-      <button class="avatar-button" type="button" aria-label="User menu">
-        <span class="avatar-face" aria-hidden="true"></span>
-      </button>
-    </header>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="topbar-brand" aria-hidden="true">
+          <div class="brand-mark">5d</div>
+        </div>
+        <nav class="topnav" aria-label="Primary">
+          <a href="#" class="topnav-link">Product List</a>
+          <a href="#" class="topnav-link">Library</a>
+          <a href="#" class="topnav-link">Set Builder</a>
+          <a href="#" class="topnav-link active">Analytics</a>
+        </nav>
+        <button class="avatar-button" type="button" aria-label="User menu">
+          <span class="avatar-face" aria-hidden="true"></span>
+        </button>
+      </header>
 
-    <main class="page-shell">
-      <section class="page-header">
-        <h1>Project details</h1>
-        <p class="subtitle">Every project, who made it, and how it's being used</p>
-      </section>
+      <main class="page-shell">
+        <section class="page-header">
+          <h1>Project details</h1>
+          <p class="subtitle">Every project, who made it, and how it's being used</p>
+        </section>
 
       <section class="filter-strip" aria-label="Analytics period filters">
         <div class="date-filter" aria-hidden="true">
@@ -62,68 +63,58 @@
           <button class="period-chip" data-period="1m" type="button">1 M</button>
           <button class="period-chip active" data-period="1y" type="button">1 Y</button>
         </div>
-
-        <div class="period-search">
-          <span class="search-icon" aria-hidden="true">
-            <svg viewBox="0 0 20 20" width="16" height="16" fill="none">
-              <path d="M8.75 14.5a5.75 5.75 0 1 1 0-11.5 5.75 5.75 0 0 1 0 11.5Z" stroke="currentColor" stroke-width="1.6" />
-              <path d="M13.25 13.25 17 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
-            </svg>
-          </span>
-          <span>Search by owner email</span>
-        </div>
       </section>
 
-      <section class="metrics-grid" id="metricsGrid" aria-label="Overview cards"></section>
+        <section class="metrics-grid" id="metricsGrid" aria-label="Overview cards"></section>
 
-      <section class="chart-grid" aria-label="Overview charts">
-        <article class="chart-card">
-          <header class="chart-header">
-            <div>
-              <div class="chart-kicker" id="leftChartValue">345k</div>
-              <div class="chart-title" id="leftChartTitle">Projects created</div>
-              <div class="chart-subtitle" id="leftChartSubtitle">Each point is one month</div>
+        <section class="chart-grid" aria-label="Overview charts">
+          <article class="chart-card">
+            <header class="chart-header">
+              <div>
+                <div class="chart-kicker" id="leftChartValue">345k</div>
+                <div class="chart-title" id="leftChartTitle">Projects created</div>
+                <div class="chart-subtitle" id="leftChartSubtitle">Each point is one month</div>
+              </div>
+              <button class="compare-control" id="leftCompareControl" type="button">
+                <span>Compare</span>
+                <span class="toggle" id="leftCompareToggle" aria-hidden="true"></span>
+              </button>
+            </header>
+            <div class="chart-legend" id="leftLegend"></div>
+            <div class="chart-body">
+              <svg id="leftChartSvg" viewBox="0 0 560 260" role="img" aria-label="Projects created chart"></svg>
             </div>
-            <button class="compare-control" id="leftCompareControl" type="button">
-              <span>Compare</span>
-              <span class="toggle" id="leftCompareToggle" aria-hidden="true"></span>
-            </button>
-          </header>
-          <div class="chart-legend" id="leftLegend"></div>
-          <div class="chart-body">
-            <svg id="leftChartSvg" viewBox="0 0 560 260" role="img" aria-label="Projects created chart"></svg>
-          </div>
-        </article>
+          </article>
 
-        <article class="chart-card">
-          <header class="chart-header">
-            <div>
-              <div class="chart-kicker" id="rightChartValue">345k</div>
-              <div class="chart-title" id="rightChartTitle">Products placed today</div>
-              <div class="chart-subtitle" id="rightChartSubtitle">Every hour shown, including hours with none placed</div>
+          <article class="chart-card">
+            <header class="chart-header">
+              <div>
+                <div class="chart-kicker" id="rightChartValue">345k</div>
+                <div class="chart-title" id="rightChartTitle">Products placed today</div>
+                <div class="chart-subtitle" id="rightChartSubtitle">Every hour shown, including hours with none placed</div>
+              </div>
+              <button class="compare-control" id="rightCompareControl" type="button">
+                <span>Compare</span>
+                <span class="toggle" id="rightCompareToggle" aria-hidden="true"></span>
+              </button>
+            </header>
+            <div class="chart-legend" id="rightLegend"></div>
+            <div class="chart-body">
+              <svg id="rightChartSvg" viewBox="0 0 560 260" role="img" aria-label="Products placed chart"></svg>
             </div>
-            <button class="compare-control" id="rightCompareControl" type="button">
-              <span>Compare</span>
-              <span class="toggle" id="rightCompareToggle" aria-hidden="true"></span>
-            </button>
-          </header>
-          <div class="chart-legend" id="rightLegend"></div>
-          <div class="chart-body">
-            <svg id="rightChartSvg" viewBox="0 0 560 260" role="img" aria-label="Products placed chart"></svg>
+          </article>
+        </section>
+
+        <section class="table-panel" aria-label="Project analytics table">
+          <div id="errorBanner" class="error-banner" hidden>
+            <span>Couldn't load projects.</span>
+            <button id="retryButton" type="button">Retry</button>
           </div>
-        </article>
-      </section>
 
-      <section class="table-panel" aria-label="Project analytics table">
-        <div id="errorBanner" class="error-banner" hidden>
-          <span>Couldn't load projects.</span>
-          <button id="retryButton" type="button">Retry</button>
-        </div>
-
-        <div class="toolbar">
-          <div class="search-wrap">
-            <label class="sr-only" for="ownerSearch">Search by owner email</label>
-            <div class="search-field">
+          <div class="toolbar">
+            <div class="search-wrap">
+              <label class="sr-only" for="ownerSearch">Search by owner email</label>
+              <div class="search-field">
               <span class="search-icon" aria-hidden="true">
                 <svg viewBox="0 0 20 20" width="16" height="16" fill="none">
                   <path d="M8.75 14.5a5.75 5.75 0 1 1 0-11.5 5.75 5.75 0 0 1 0 11.5Z" stroke="currentColor" stroke-width="1.6" />
@@ -135,8 +126,8 @@
             <div id="suggestions" class="suggestions" hidden></div>
           </div>
 
-          <button id="exportButton" class="export-button" type="button">
-            <span class="button-icon" aria-hidden="true">
+            <button id="exportButton" class="export-button" type="button">
+              <span class="button-icon" aria-hidden="true">
               <svg viewBox="0 0 20 20" width="16" height="16" fill="none">
                 <path d="M10 2.5v8.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
                 <path d="m6.5 7.2 3.5 3.5 3.5-3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
@@ -145,57 +136,58 @@
             </span>
             Export CSV
           </button>
-        </div>
-
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th class="col-project">Project</th>
-                <th class="col-id">ID</th>
-                <th class="col-products">
-                  <span>Products placed</span>
-                  <button class="info-icon" type="button" data-tooltip="products" aria-label="Products placed info">i</button>
-                </th>
-                <th class="col-actions">
-                  <span>Actions taken</span>
-                  <button class="info-icon" type="button" data-tooltip="actions" aria-label="Actions taken info">i</button>
-                </th>
-                <th class="col-views">Views</th>
-                <th class="col-budget">Budget</th>
-                <th class="col-status">Status</th>
-                <th class="col-created">Created</th>
-              </tr>
-            </thead>
-            <tbody id="tableBody"></tbody>
-          </table>
-        </div>
-
-        <div class="pagination-bar">
-          <div class="page-size">
-            <label for="perPage">Items per page:</label>
-            <select id="perPage">
-              <option value="25">25</option>
-              <option value="50">50</option>
-              <option value="100">100</option>
-            </select>
           </div>
 
-          <div id="pageSummary" class="page-summary">1–100 of 2000 items</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="col-project">Project</th>
+                  <th class="col-id">ID</th>
+                  <th class="col-products">
+                    <span>Products placed</span>
+                    <button class="info-icon" type="button" data-tooltip="products" aria-label="Products placed info">i</button>
+                  </th>
+                  <th class="col-actions">
+                    <span>Actions taken</span>
+                    <button class="info-icon" type="button" data-tooltip="actions" aria-label="Actions taken info">i</button>
+                  </th>
+                  <th class="col-views">Views</th>
+                  <th class="col-budget">Budget</th>
+                  <th class="col-status">Status</th>
+                  <th class="col-created">Created</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
 
-          <div class="pager">
-            <button id="prevPage" type="button">Prev</button>
-            <div id="pageNumbers" class="page-numbers"></div>
-            <button id="nextPage" type="button">Next</button>
-            <div class="skip-pages">
-              <span>Skip 5 pages</span>
-              <button id="skipBack" type="button" aria-label="Skip 5 pages back">‹</button>
-              <button id="skipForward" type="button" aria-label="Skip 5 pages forward">›</button>
+          <div class="pagination-bar">
+            <div class="page-size">
+              <label for="perPage">Items per page:</label>
+              <select id="perPage">
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+
+            <div id="pageSummary" class="page-summary">1–100 of 2000 items</div>
+
+            <div class="pager">
+              <button id="prevPage" type="button">Prev</button>
+              <div id="pageNumbers" class="page-numbers"></div>
+              <button id="nextPage" type="button">Next</button>
+              <div class="skip-pages">
+                <span>Skip 5 pages</span>
+                <button id="skipBack" type="button" aria-label="Skip 5 pages back">‹</button>
+                <button id="skipForward" type="button" aria-label="Skip 5 pages forward">›</button>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
-    </main>
+        </section>
+      </main>
+    </div>
 
     <div id="tooltip" class="tooltip" hidden role="tooltip"></div>
     <div id="toast" class="toast" hidden></div>
