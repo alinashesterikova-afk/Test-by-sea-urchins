@@ -1,4 +1,4 @@
-import { PROJECTS, buildDashboard, buildProjectPage, getSuggestionPool } from "./shared-data.js";
+import { PROJECTS, buildDashboard, buildProjectPage, getSuggestionPool } from "./shared-data.js?v=2";
 
 const state = {
   period: "1y",
