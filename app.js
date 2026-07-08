@@ -755,7 +755,7 @@ function renderAnalytics(analytics) {
     elements.leftChartInfo.dataset.tooltip = state.compareLeft ? "chartProjectsOn" : "chartProjectsOff";
   }
   if (elements.leftChartNote) {
-    elements.leftChartNote.textContent = getChartNote();
+    elements.leftChartNote.hidden = true;
   }
   renderLegend(elements.leftLegend, state.compareLeft ? [
     { label: analytics.ranges.labels.current, color: "green" },
@@ -776,7 +776,7 @@ function renderAnalytics(analytics) {
     elements.rightChartInfo.dataset.tooltip = state.compareRight ? "chartProductsOn" : "chartProductsOff";
   }
   if (elements.rightChartNote) {
-    elements.rightChartNote.textContent = getRightChartNote();
+    elements.rightChartNote.hidden = true;
   }
   renderLegend(elements.rightLegend, state.compareRight ? [
     { label: analytics.ranges.labels.current, color: "green" },
