@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "/Users/farben/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node server.mjs",
-    "build": "/Users/farben/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/build.mjs"
+    "start": "sh ./scripts/run-node.sh server.mjs",
+    "build": "sh ./scripts/run-node.sh scripts/build.mjs"
   }
 }
