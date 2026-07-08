@@ -23,13 +23,10 @@ fs.copyFileSync(path.join(root, ".openai", "hosting.json"), path.join(openaiDir,
 
 fs.writeFileSync(
   path.join(serverDir, "index.js"),
-  `import fs from "node:fs";
-import path from "node:path";
-import http from "node:http";
-import { fileURLToPath } from "node:url";
+  `const fs = require("node:fs");
+const path = require("node:path");
+const http = require("node:http");
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const clientRoot = path.resolve(__dirname, "..", "client");
 const port = Number(process.env.PORT || 3000);
 
