@@ -27,7 +27,10 @@ function makeRng(seed) {
 }
 
 function formatDate(date) {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function startOfDay(date) {
@@ -210,7 +213,9 @@ function bucketLabelsFor(config, end) {
 
   return Array.from({ length: config.durationDays }, (_, offset) => {
     const date = addDays(startOfDay(end), -(config.durationDays - 1 - offset));
-    return date.toISOString().slice(5, 10);
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${month}-${day}`;
   });
 }
 
@@ -228,7 +233,9 @@ function bucketStart(config, end) {
 function bucketKeyFor(config, date) {
   if (config.mode === "hour") return String(date.getHours()).padStart(2, "0");
   if (config.mode === "month") return String(date.getMonth()).padStart(2, "0");
-  return date.toISOString().slice(5, 10);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${month}-${day}`;
 }
 
 function buildSeries(items, config, end) {
@@ -284,8 +291,8 @@ function buildSeries(items, config, end) {
 
 function buildDashboard(period, compare, ownerEmail = "") {
   const { config, start: currentStart, end } = parsePeriodRange(period);
-  const previousEnd = addDays(currentStart, -1);
-  const previousStart = config.mode === "month" ? new Date(previousEnd.getFullYear() - 1, 0, 1) : addDays(previousEnd, -(config.durationDays - 1));
+  const previousEnd = endOfDay(addDays(currentStart, -1));
+  const previousStart = config.mode === "month" ? new Date(previousEnd.getFullYear(), 0, 1) : addDays(currentStart, -config.durationDays);
   const ownerNeedle = ownerEmail.trim().toLowerCase();
   const ownerMatches = ownerNeedle
     ? (item) => item.ownerEmail.toLowerCase().includes(ownerNeedle)
@@ -398,7 +405,7 @@ function buildDashboard(period, compare, ownerEmail = "") {
       },
       right: {
         value: totals.products.toLocaleString("en-US"),
-        title: config.mode === "hour" ? "Products placed today" : config.mode === "month" ? "Proproducts placed today" : "Products placed this period",
+        title: config.mode === "hour" ? "Products placed today" : "Products placed by day",
         subtitle:
           config.mode === "hour"
             ? "Every hour shown, including hours with none placed"

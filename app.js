@@ -2,9 +2,10 @@ import {
   PROJECTS,
   buildDashboard,
   buildProjectPage,
+  formatRangeLabel,
   niceAxis,
   getSuggestionPool,
-} from "./shared-data.js?v=4";
+} from "./shared-data.js?v=5";
 
 const state = {
   period: "1y",
@@ -13,6 +14,7 @@ const state = {
   page: 1,
   perPage: 100,
   ownerEmail: "",
+  customRange: null,
   analytics: null,
   total: 0,
   items: [],
@@ -29,22 +31,42 @@ const state = {
   tooltip: null,
   dialogProject: null,
   filterTimer: null,
+  datePickerOpen: false,
+  datePickerMonth: new Date(),
+  datePickerStart: null,
+  datePickerEnd: null,
 };
 
 const elements = {
   metricsGrid: document.getElementById("metricsGrid"),
   leftChartValue: document.getElementById("leftChartValue"),
   leftChartTitle: document.getElementById("leftChartTitle"),
+  leftChartInfo: document.getElementById("leftChartInfo"),
   leftChartDelta: document.getElementById("leftChartDelta"),
   leftChartSubtitle: document.getElementById("leftChartSubtitle"),
+  leftChartNote: document.getElementById("leftChartNote"),
   leftLegend: document.getElementById("leftLegend"),
   leftChartSvg: document.getElementById("leftChartSvg"),
   rightChartValue: document.getElementById("rightChartValue"),
   rightChartTitle: document.getElementById("rightChartTitle"),
+  rightChartInfo: document.getElementById("rightChartInfo"),
   rightChartDelta: document.getElementById("rightChartDelta"),
   rightChartSubtitle: document.getElementById("rightChartSubtitle"),
+  rightChartNote: document.getElementById("rightChartNote"),
   rightLegend: document.getElementById("rightLegend"),
   rightChartSvg: document.getElementById("rightChartSvg"),
+  periodNote: document.getElementById("periodNote"),
+  dateFilterButton: document.getElementById("dateFilterButton"),
+  datePicker: document.getElementById("datePicker"),
+  datePickerTitle: document.getElementById("datePickerTitle"),
+  datePickerSubtitle: document.getElementById("datePickerSubtitle"),
+  datePickerMonths: document.getElementById("datePickerMonths"),
+  datePickerPrev: document.getElementById("datePickerPrev"),
+  datePickerNext: document.getElementById("datePickerNext"),
+  datePickerClear: document.getElementById("datePickerClear"),
+  datePickerApply: document.getElementById("datePickerApply"),
+  dateFromLabel: document.getElementById("dateFromLabel"),
+  dateToLabel: document.getElementById("dateToLabel"),
   leftCompareControl: document.getElementById("leftCompareControl"),
   rightCompareControl: document.getElementById("rightCompareControl"),
   leftCompareToggle: document.getElementById("leftCompareToggle"),
@@ -103,6 +125,196 @@ async function fetchJson(url, options = {}) {
     throw new Error(`Request failed: ${response.status}`);
   }
   return response.json();
+}
+
+function isFileProtocol() {
+  return window.location.protocol === "file:";
+}
+
+function startOfDay(date) {
+  const out = new Date(date);
+  out.setHours(0, 0, 0, 0);
+  return out;
+}
+
+function endOfDay(date) {
+  const out = new Date(date);
+  out.setHours(23, 59, 59, 999);
+  return out;
+}
+
+function addDays(date, days) {
+  const out = new Date(date);
+  out.setDate(out.getDate() + days);
+  return out;
+}
+
+function addMonths(date, months) {
+  const out = new Date(date);
+  out.setMonth(out.getMonth() + months);
+  return out;
+}
+
+function differenceInCalendarDays(start, end) {
+  return Math.round((startOfDay(end).getTime() - startOfDay(start).getTime()) / 86400000);
+}
+
+function parseDateInput(value) {
+  if (!value) return null;
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function coerceDate(value) {
+  if (!value) return null;
+  return value instanceof Date ? value : new Date(value);
+}
+
+function formatRangeValue(date) {
+  return date.toLocaleString("en-US", { month: "short", day: "numeric" });
+}
+
+function formatDateInput(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getCustomRangeMode(start, end) {
+  return differenceInCalendarDays(start, end) === 0 ? "hour" : "day";
+}
+
+function getActiveRange() {
+  if (state.customRange?.start && state.customRange?.end) {
+    return {
+      ...state.customRange,
+      mode: getCustomRangeMode(state.customRange.start, state.customRange.end),
+      custom: true,
+    };
+  }
+
+  return {
+    custom: false,
+    period: state.period,
+  };
+}
+
+function getRequestParams() {
+  const range = getActiveRange();
+  if (range.custom) {
+    return {
+      date_from: formatDateInput(range.start),
+      date_to: formatDateInput(range.end),
+    };
+  }
+
+  return { period: state.period };
+}
+
+function buildCurrentRangeLabel() {
+  const range = getActiveRange();
+  if (range.custom) {
+    return formatRangeLabel(range.start, range.end);
+  }
+  const current = state.analytics?.ranges?.current;
+  return current ? formatRangeLabel(coerceDate(current.start), coerceDate(current.end)) : "Selected period";
+}
+
+function buildPreviousRangeLabel() {
+  const previous = state.analytics?.ranges?.previous;
+  return previous ? formatRangeLabel(coerceDate(previous.start), coerceDate(previous.end)) : "";
+}
+
+function updateDateFilterLabels() {
+  const range = getActiveRange();
+  if (range.custom) {
+    elements.dateFromLabel.textContent = formatRangeValue(range.start);
+    elements.dateToLabel.textContent = formatRangeValue(range.end);
+  } else {
+    elements.dateFromLabel.textContent = "From";
+    elements.dateToLabel.textContent = "Until";
+  }
+}
+
+function getPeriodNote() {
+  const current = buildCurrentRangeLabel();
+  const previous = buildPreviousRangeLabel();
+  if (!previous) return "";
+  return `Showing ${current} compared to ${previous} — the same number of days right before this period`;
+}
+
+function getChartNote() {
+  const range = getActiveRange();
+  if (range.custom) {
+    return range.mode === "hour" ? "Each point is one hour" : "Each point is one day";
+  }
+
+  if (state.period === "today") return "Each point is one hour";
+  if (state.period === "1y") return "Each point is one month · Month in progress";
+  return "Each point is one day";
+}
+
+function getRightChartNote() {
+  return "Every day shown, including days with none placed";
+}
+
+function getYearNote() {
+  if (state.period === "1y" && !state.customRange) {
+    return "Month in progress";
+  }
+  return "";
+}
+
+function monthStart(date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function monthEnd(date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+}
+
+function buildCalendarMonth(date) {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const first = new Date(year, month, 1);
+  const last = monthEnd(first);
+  const leading = (first.getDay() + 6) % 7;
+  const days = [];
+  const start = addDays(first, -leading);
+
+  for (let index = 0; index < 42; index += 1) {
+    days.push(addDays(start, index));
+  }
+
+  return {
+    title: date.toLocaleString("en-US", { month: "long", year: "numeric" }),
+    days,
+    month,
+    year,
+    first,
+    last,
+  };
+}
+
+function isSameDate(a, b) {
+  return Boolean(a && b) && formatDateInput(a) === formatDateInput(b);
+}
+
+function isInRange(date, start, end) {
+  if (!start || !end) return false;
+  const current = startOfDay(date).getTime();
+  return current >= startOfDay(start).getTime() && current <= endOfDay(end).getTime();
+}
+
+function setCustomRange(start, end) {
+  state.customRange = { start: startOfDay(start), end: endOfDay(end) };
+  updateDateFilterLabels();
+}
+
+function clearCustomRange() {
+  state.customRange = null;
+  updateDateFilterLabels();
 }
 
 function showToast(message) {
@@ -413,6 +625,13 @@ function renderLegend(container, items) {
 function renderMetrics(metrics) {
   elements.metricsGrid.innerHTML = metrics.cards
     .map((card, index) => {
+      const tooltipMap = [
+        "metricProjects",
+        "metricProducts",
+        "metricActions",
+        "metricActive",
+        "metricBudget",
+      ];
       const accentColor = card.accent === "red" ? "#f8c1c1" : "#c6f5c8";
       const sparkColor = card.accent === "red" ? "#ff6d73" : "#5ada6d";
       const sparkFill = card.accent === "red" ? "rgba(255,109,115,0.16)" : "rgba(90,218,109,0.16)";
@@ -420,7 +639,7 @@ function renderMetrics(metrics) {
         <article class="metric-card">
           <div class="metric-header">
             <div class="metric-title">${escapeHtml(card.title)}</div>
-            <button class="info-icon" type="button" data-tooltip="${index === 2 ? "actions" : "metric"}" aria-label="${escapeHtml(card.title)} info">i</button>
+            <button class="info-icon" type="button" data-tooltip="${tooltipMap[index] || "metricProjects"}" aria-label="${escapeHtml(card.title)} info">i</button>
           </div>
           <div class="metric-body">
             <div>
@@ -446,6 +665,12 @@ function renderAnalytics(analytics) {
   elements.leftChartTitle.textContent = analytics.charts.left.title;
   elements.leftChartSubtitle.textContent = analytics.charts.left.subtitle;
   elements.leftChartDelta.innerHTML = renderDeltaChip(analytics.charts.left.delta, { compact: true });
+  if (elements.leftChartInfo) {
+    elements.leftChartInfo.dataset.tooltip = state.compareLeft ? "chartProjectsOn" : "chartProjectsOff";
+  }
+  if (elements.leftChartNote) {
+    elements.leftChartNote.textContent = getChartNote();
+  }
   renderLegend(elements.leftLegend, state.compareLeft ? [
     { label: analytics.ranges.labels.current, color: "green" },
     { label: analytics.ranges.labels.previous, color: "gray" },
@@ -461,6 +686,12 @@ function renderAnalytics(analytics) {
   elements.rightChartTitle.textContent = analytics.charts.right.title;
   elements.rightChartSubtitle.textContent = analytics.charts.right.subtitle;
   elements.rightChartDelta.innerHTML = renderDeltaChip(analytics.charts.right.delta, { compact: true });
+  if (elements.rightChartInfo) {
+    elements.rightChartInfo.dataset.tooltip = state.compareRight ? "chartProductsOn" : "chartProductsOff";
+  }
+  if (elements.rightChartNote) {
+    elements.rightChartNote.textContent = getRightChartNote();
+  }
   renderLegend(elements.rightLegend, state.compareRight ? [
     { label: analytics.ranges.labels.current, color: "green" },
     { label: analytics.ranges.labels.previous, color: "gray" },
@@ -469,6 +700,10 @@ function renderAnalytics(analytics) {
 
   elements.leftCompareToggle.classList.toggle("on", state.compareLeft);
   elements.rightCompareToggle.classList.toggle("on", state.compareRight);
+  if (elements.periodNote) {
+    elements.periodNote.textContent = getPeriodNote();
+  }
+  updateDateFilterLabels();
 }
 
 function renderSkeletonProjects() {
@@ -607,12 +842,24 @@ function highlightMatch(value, query) {
 
 function openTooltip(button) {
   const kind = button.dataset.tooltip;
-  const text =
-    kind === "actions"
-      ? "Moves, rotations, resizes and texture changes made in this project"
-      : kind === "products"
-        ? "Number of items placed in this project"
-        : "Metrics update with the selected period";
+  const tooltipTexts = {
+    metricProjects: "Total number of new projects started in the selected period.",
+    metricProducts: "How many times a product was added into a scene. One product used in 3 scenes counts as 3.",
+    metricActions: "Every time a user moves, rotates, resizes, or changes a texture on an item, it counts as one action.",
+    metricActive: "Share of projects that still exist out of all projects created in this period.",
+    metricBudget: "Total value of products placed across all projects, based on catalog price.",
+    chartProjectsOff: "Each point shows how many new projects were started in that time bucket.",
+    chartProjectsOn: "Solid line is the period you selected. Dashed line is the same number of days right before it.",
+    chartProductsOff: "Each bar is the total units placed in that time bucket, across all SKUs.",
+    chartProductsOn: "Green bars are the period you selected. Grey bars are the same number of days right before it.",
+    tableProducts: "Number of items added to this project. Click to see which products were used.",
+    tableActions: "Moves, rotations, resizes and texture changes made in this project.",
+    tableViews: "Times this project was opened after being shared publicly.",
+    tableBudget: "Total value of products placed in this project, based on catalog price.",
+    actions: "Moves, rotations, resizes and texture changes made in this project",
+    products: "Number of items placed in this project",
+  };
+  const text = tooltipTexts[kind] ?? "Metrics update with the selected period";
 
   const rect = button.getBoundingClientRect();
   const tooltip = elements.tooltip;
@@ -648,15 +895,183 @@ function openProductsDialog(project) {
   elements.productsDialog.showModal();
 }
 
+async function getAnalyticsData() {
+  const params = getRequestParams();
+  const range = getActiveRange();
+  const query = buildQuery({
+    ...params,
+    compare: 1,
+    owner_email: state.ownerEmail,
+  });
+
+  if (!isFileProtocol() && !range.custom) {
+    try {
+      return await fetchJson(`/api/analytics?${query}`);
+    } catch {
+      // fall back below
+    }
+  }
+
+  return buildDashboard(
+    state.period,
+    true,
+    state.ownerEmail,
+    PROJECTS,
+    params.date_from ?? "",
+    params.date_to ?? "",
+  );
+}
+
+async function getProjectsData() {
+  const params = getRequestParams();
+  const range = getActiveRange();
+  const query = buildQuery({
+    page: state.page,
+    per_page: state.perPage,
+    owner_email: state.ownerEmail,
+    ...params,
+  });
+
+  if (!isFileProtocol() && !range.custom) {
+    try {
+      return await fetchJson(`/api/projects?${query}`);
+    } catch {
+      // fall back below
+    }
+  }
+
+  return buildProjectPage({
+    page: state.page,
+    perPage: state.perPage,
+    ownerEmail: state.ownerEmail,
+    period: state.period,
+    projects: PROJECTS,
+    dateFrom: params.date_from ?? "",
+    dateTo: params.date_to ?? "",
+  });
+}
+
+function closeDatePicker() {
+  state.datePickerOpen = false;
+  elements.datePicker.hidden = true;
+  elements.dateFilterButton.setAttribute("aria-expanded", "false");
+}
+
+function renderMonthHeader(monthDate) {
+  const label = monthDate.toLocaleString("en-US", { month: "long", year: "numeric" });
+  return `
+    <div class="calendar-month">
+      <div class="calendar-month-header">${escapeHtml(label)}</div>
+      <div class="calendar-weekdays">
+        <span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span>
+      </div>
+      <div class="calendar-days">
+        ${buildCalendarMonth(monthDate).days
+          .map((day) => {
+            const isOutside = day.getMonth() !== monthDate.getMonth();
+            const isSelectedStart = isSameDate(day, state.datePickerStart);
+            const isSelectedEnd = isSameDate(day, state.datePickerEnd);
+            const inRange = isInRange(day, state.datePickerStart, state.datePickerEnd);
+            const isToday = isSameDate(day, new Date());
+            return `
+              <button
+                type="button"
+                class="calendar-day ${isOutside ? "outside" : ""} ${inRange ? "in-range" : ""} ${isSelectedStart ? "start" : ""} ${isSelectedEnd ? "end" : ""} ${isToday ? "today" : ""}"
+                data-date="${formatDateInput(day)}"
+                ${isOutside ? 'tabindex="-1"' : ""}
+              >${day.getDate()}</button>
+            `;
+          })
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderDatePicker() {
+  const month = startOfDay(state.datePickerMonth);
+  const nextMonth = addMonths(month, 1);
+  elements.datePickerTitle.textContent = state.datePickerStart && state.datePickerEnd ? "Selected date range" : "Choose a date or range";
+  elements.datePickerSubtitle.textContent = state.datePickerStart && !state.datePickerEnd ? "Pick an end date to complete the range" : "Choose one day or select a range";
+  elements.datePickerApply.disabled = !state.datePickerStart;
+  elements.datePickerMonths.innerHTML = `${renderMonthHeader(month)}${renderMonthHeader(nextMonth)}`;
+  elements.datePickerPrev.disabled = false;
+  elements.datePickerNext.disabled = false;
+}
+
+function openDatePicker() {
+  const range = getActiveRange();
+  if (range.custom) {
+    state.datePickerStart = new Date(range.start);
+    state.datePickerEnd = new Date(range.end);
+    state.datePickerMonth = monthStart(range.start);
+  } else {
+    const anchor = new Date();
+    state.datePickerStart = null;
+    state.datePickerEnd = null;
+    state.datePickerMonth = monthStart(anchor);
+  }
+  state.datePickerOpen = true;
+  renderDatePicker();
+  elements.datePicker.hidden = false;
+  elements.dateFilterButton.setAttribute("aria-expanded", "true");
+}
+
+function selectCalendarDate(date) {
+  if (!state.datePickerStart || (state.datePickerStart && state.datePickerEnd)) {
+    state.datePickerStart = startOfDay(date);
+    state.datePickerEnd = null;
+    return;
+  }
+
+  const clicked = startOfDay(date);
+  if (clicked.getTime() < state.datePickerStart.getTime()) {
+    state.datePickerEnd = state.datePickerStart;
+    state.datePickerStart = clicked;
+  } else {
+    state.datePickerEnd = clicked;
+  }
+}
+
+function applyDatePickerRange() {
+  if (!state.datePickerStart) return;
+  const end = state.datePickerEnd || state.datePickerStart;
+  setCustomRange(state.datePickerStart, end);
+  closeDatePicker();
+  refreshAll({ resetPage: true });
+}
+
+function clearDatePickerRange() {
+  state.datePickerStart = null;
+  state.datePickerEnd = null;
+  clearCustomRange();
+  closeDatePicker();
+  refreshAll({ resetPage: true });
+}
+
+function shiftDatePickerMonth(months) {
+  state.datePickerMonth = addMonths(state.datePickerMonth, months);
+  renderDatePicker();
+}
+
+async function resolveData(loader, fallback) {
+  if (isFileProtocol()) {
+    return fallback();
+  }
+
+  try {
+    return await loader();
+  } catch {
+    return fallback();
+  }
+}
+
 async function loadAnalytics() {
   const token = ++state.analyticsToken;
   state.loadingAnalytics = true;
   elements.analyticsErrorBanner.hidden = true;
   try {
-    const data = await fetchJson(`/api/analytics?${buildQuery({
-      period: state.period,
-      owner_email: state.ownerEmail,
-    })}`);
+    const data = await getAnalyticsData();
     if (token !== state.analyticsToken) return;
     state.loadingAnalytics = false;
     elements.analyticsErrorBanner.hidden = true;
@@ -664,8 +1079,17 @@ async function loadAnalytics() {
   } catch (error) {
     if (token !== state.analyticsToken) return;
     state.loadingAnalytics = false;
+    const params = getRequestParams();
+    const fallback = buildDashboard(
+      state.period,
+      true,
+      state.ownerEmail,
+      PROJECTS,
+      params.date_from ?? "",
+      params.date_to ?? "",
+    );
+    renderAnalytics(fallback);
     elements.analyticsErrorBanner.hidden = false;
-    renderAnalyticsFallback(buildDashboard(state.period, true, state.ownerEmail, PROJECTS));
   }
 }
 
@@ -676,12 +1100,7 @@ async function loadProjects() {
   renderSkeletonProjects();
 
   try {
-    const data = await fetchJson(`/api/projects?${buildQuery({
-      page: state.page,
-      per_page: state.perPage,
-      owner_email: state.ownerEmail,
-      period: state.period,
-    })}`);
+    const data = await getProjectsData();
     if (token !== state.projectToken) return;
     state.loadingProjects = false;
     state.total = data.total;
@@ -692,10 +1111,20 @@ async function loadProjects() {
     if (token !== state.projectToken) return;
     state.loadingProjects = false;
     state.error = error;
-    state.total = 0;
-    state.items = [];
-    renderProjectErrorState();
-    renderPagination(0);
+    const params = getRequestParams();
+    const fallback = buildProjectPage({
+      page: state.page,
+      perPage: state.perPage,
+      ownerEmail: state.ownerEmail,
+      period: state.period,
+      projects: PROJECTS,
+      dateFrom: params.date_from ?? "",
+      dateTo: params.date_to ?? "",
+    });
+    state.total = fallback.total;
+    state.items = fallback.items;
+    renderRows(fallback);
+    renderPagination(fallback.total);
   }
 }
 
@@ -711,7 +1140,7 @@ function refreshAll({ resetPage = false } = {}) {
 
 function syncPeriodButtons() {
   periodButtons.forEach((button) => {
-    button.classList.toggle("active", button.dataset.period === state.period);
+    button.classList.toggle("active", !state.customRange && button.dataset.period === state.period);
   });
 }
 
@@ -770,22 +1199,12 @@ elements.suggestions.addEventListener("click", (event) => {
 
 elements.exportButton.addEventListener("click", async () => {
   try {
-    const data = await fetchJson(`/api/projects?${buildQuery({
-      page: state.page,
-      per_page: state.perPage,
-      owner_email: state.ownerEmail,
-      period: state.period,
-    })}`).catch(() => buildProjectPage({
-      page: state.page,
-      perPage: state.perPage,
-      ownerEmail: state.ownerEmail,
-      period: state.period,
-      projects: PROJECTS,
-    }));
+    const data = await getProjectsData();
     const csv = buildCsv(data.items);
-    const dates = data.items.map((item) => item.created).sort();
-    const from = dates[0] ?? "0000-00-00";
-    const to = dates[dates.length - 1] ?? "0000-00-00";
+    const range = getActiveRange();
+    const currentRange = state.analytics?.ranges?.current;
+    const from = range.custom ? formatDateInput(range.start) : currentRange?.start ? formatDateInput(coerceDate(currentRange.start)) : "0000-00-00";
+    const to = range.custom ? formatDateInput(range.end) : currentRange?.end ? formatDateInput(coerceDate(currentRange.end)) : "0000-00-00";
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -880,9 +1299,42 @@ elements.rightCompareControl.addEventListener("click", () => {
   if (state.analytics) renderAnalytics(state.analytics);
 });
 
+elements.dateFilterButton.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  if (state.datePickerOpen) {
+    closeDatePicker();
+    return;
+  }
+  openDatePicker();
+});
+
+elements.datePickerPrev.addEventListener("click", () => {
+  shiftDatePickerMonth(-1);
+});
+
+elements.datePickerNext.addEventListener("click", () => {
+  shiftDatePickerMonth(1);
+});
+
+elements.datePickerClear.addEventListener("click", clearDatePickerRange);
+
+elements.datePickerApply.addEventListener("click", applyDatePickerRange);
+
+elements.datePickerMonths.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-date]");
+  if (!button) return;
+  const clicked = parseDateInput(button.dataset.date);
+  if (!clicked) return;
+  selectCalendarDate(clicked);
+  renderDatePicker();
+});
+
 periodButtons.forEach((button) => {
   button.addEventListener("click", () => {
     state.period = button.dataset.period;
+    state.customRange = null;
+    updateDateFilterLabels();
     syncPeriodButtons();
     refreshAll({ resetPage: true });
   });
@@ -891,6 +1343,14 @@ periodButtons.forEach((button) => {
 document.addEventListener("click", (event) => {
   if (!event.target.closest(".search-wrap")) {
     hideSuggestions();
+  }
+
+  if (state.datePickerOpen) {
+    const insidePicker = event.target.closest(".date-picker");
+    const insideFilter = event.target.closest(".date-filter");
+    if (!insidePicker && !insideFilter) {
+      closeDatePicker();
+    }
   }
 
   const tooltipButton = event.target.closest("[data-tooltip]");
@@ -923,6 +1383,7 @@ window.addEventListener("resize", () => {
 });
 
 syncPeriodButtons();
+updateDateFilterLabels();
 loadSuggestionPool().then(() => {
   refreshAll();
 });

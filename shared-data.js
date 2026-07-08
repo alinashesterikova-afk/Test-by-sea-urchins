@@ -19,7 +19,10 @@ function makeRng(seed) {
 }
 
 function formatDate(date) {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function startOfDay(date) {
@@ -44,6 +47,40 @@ function addMonths(date, months) {
   const out = new Date(date);
   out.setMonth(out.getMonth() + months);
   return out;
+}
+
+function parseDateInput(value) {
+  if (!value) return null;
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function differenceInDaysInclusive(start, end) {
+  return Math.max(1, Math.round((startOfDay(end).getTime() - startOfDay(start).getTime()) / 86400000) + 1);
+}
+
+function buildRequestedRange(period, dateFrom, dateTo) {
+  const from = parseDateInput(dateFrom);
+  const to = parseDateInput(dateTo);
+
+  if (from && to) {
+    const start = startOfDay(from <= to ? from : to);
+    const end = endOfDay(from <= to ? to : from);
+    const durationDays = differenceInDaysInclusive(start, end);
+    return {
+      custom: true,
+      config: {
+        label: formatRangeLabel(start, end),
+        durationDays,
+        mode: durationDays === 1 ? "hour" : "day",
+      },
+      start,
+      end,
+    };
+  }
+
+  const parsed = parsePeriodRange(period);
+  return { ...parsed, custom: false };
 }
 
 const ownerEmails = [
@@ -180,7 +217,7 @@ export function formatShortDate(date) {
 }
 
 export function formatRangeLabel(start, end) {
-  const sameDay = start.toISOString().slice(0, 10) === end.toISOString().slice(0, 10);
+  const sameDay = formatDate(start) === formatDate(end);
   return sameDay ? formatShortDate(end) : `${formatShortDate(start)} – ${formatShortDate(end)}`;
 }
 
@@ -255,7 +292,9 @@ function bucketLabelsFor(config, end) {
 
   return Array.from({ length: config.durationDays }, (_, offset) => {
     const date = addDays(startOfDay(end), -(config.durationDays - 1 - offset));
-    return date.toISOString().slice(5, 10);
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${month}-${day}`;
   });
 }
 
@@ -320,10 +359,15 @@ function buildSeries(items, config, end) {
   return { labels, buckets };
 }
 
-export function buildDashboard(period, compare, ownerEmail = "", projects = PROJECTS) {
-  const { config, start: currentStart, end } = parsePeriodRange(period);
-  const previousEnd = addDays(currentStart, -1);
-  const previousStart = config.mode === "month" ? new Date(previousEnd.getFullYear() - 1, 0, 1) : addDays(previousEnd, -(config.durationDays - 1));
+export function buildDashboard(period, compare, ownerEmail = "", projects = PROJECTS, dateFrom = "", dateTo = "") {
+  const requestedRange = buildRequestedRange(period, dateFrom, dateTo);
+  const { config, start: currentStart, end } = requestedRange;
+  const previousEnd = endOfDay(addDays(currentStart, -1));
+  const previousStart = config.mode === "month"
+    ? new Date(previousEnd.getFullYear(), 0, 1)
+    : config.mode === "hour"
+      ? startOfDay(addDays(currentStart, -1))
+      : addDays(currentStart, -config.durationDays);
   const ownerNeedle = ownerEmail.trim().toLowerCase();
   const ownerMatches = ownerNeedle
     ? (item) => item.ownerEmail.toLowerCase().includes(ownerNeedle)
@@ -366,7 +410,12 @@ export function buildDashboard(period, compare, ownerEmail = "", projects = PROJ
   const compareLineSeries = previousSeries?.buckets.map((bucket) => bucket.created) ?? [];
   const barSeries = currentSeries.buckets.map((bucket) => bucket.products);
   const compareBarSeries = previousSeries?.buckets.map((bucket) => bucket.products) ?? [];
-  const comparisonLabels = describeComparisonLabels(period, currentStart, end, previousStart, previousEnd);
+  const comparisonLabels = requestedRange.custom
+    ? {
+        current: formatRangeLabel(currentStart, end),
+        previous: formatRangeLabel(previousStart, previousEnd),
+      }
+    : describeComparisonLabels(period, currentStart, end, previousStart, previousEnd);
   const periodPreviousStart = previousStart;
   const periodPreviousEnd = previousEnd;
 
@@ -434,7 +483,7 @@ export function buildDashboard(period, compare, ownerEmail = "", projects = PROJ
       },
       right: {
         value: totals.products.toLocaleString("en-US"),
-        title: config.mode === "hour" ? "Products placed today" : config.mode === "month" ? "Products placed this year" : "Products placed this period",
+        title: config.mode === "hour" ? "Products placed today" : "Products placed by day",
         subtitle:
           config.mode === "hour"
             ? "Every hour shown, including hours with none placed"
@@ -457,9 +506,9 @@ export function buildDashboard(period, compare, ownerEmail = "", projects = PROJ
   };
 }
 
-export function buildProjectPage({ page = 1, perPage = 100, ownerEmail = "", period = "1y", projects = PROJECTS } = {}) {
+export function buildProjectPage({ page = 1, perPage = 100, ownerEmail = "", period = "1y", projects = PROJECTS, dateFrom = "", dateTo = "" } = {}) {
   const ownerNeedle = ownerEmail.trim().toLowerCase();
-  const { start, end } = parsePeriodRange(period);
+  const { start, end } = buildRequestedRange(period, dateFrom, dateTo);
   const filtered = projects.filter((project) => {
     const created = new Date(project.createdAt);
     const ownerOk = ownerNeedle ? project.ownerEmail.toLowerCase().includes(ownerNeedle) : true;
