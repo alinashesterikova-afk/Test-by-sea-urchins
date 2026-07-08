@@ -40,6 +40,12 @@ function addDays(date, days) {
   return out;
 }
 
+function addMonths(date, months) {
+  const out = new Date(date);
+  out.setMonth(out.getMonth() + months);
+  return out;
+}
+
 const ownerEmails = [
   "client@manager.com",
   "alex@studioalpha.com",
@@ -144,7 +150,8 @@ function pickPeriodConfig(period) {
 
 export function parsePeriodRange(period) {
   const config = pickPeriodConfig(period);
-  const end = endOfDay(new Date());
+  const anchor = startOfDay(new Date());
+  const end = period === "today" ? endOfDay(anchor) : endOfDay(addDays(anchor, -1));
   if (config.mode === "month") {
     return {
       config,
@@ -157,14 +164,83 @@ export function parsePeriodRange(period) {
     return {
       config,
       start: startOfDay(end),
-      end: endOfDay(end),
+      end,
     };
   }
 
   return {
     config,
-    start: addDays(startOfDay(end), -(config.durationDays - 1)),
+    start: config.mode === "day" ? addDays(startOfDay(end), -(config.durationDays - 1)) : addMonths(end, -1),
     end,
+  };
+}
+
+export function formatShortDate(date) {
+  return date.toLocaleString("en-US", { month: "short", day: "numeric" });
+}
+
+export function formatRangeLabel(start, end) {
+  const sameDay = start.toISOString().slice(0, 10) === end.toISOString().slice(0, 10);
+  return sameDay ? formatShortDate(end) : `${formatShortDate(start)} – ${formatShortDate(end)}`;
+}
+
+export function describeComparisonLabels(period, currentStart, currentEnd, previousStart, previousEnd) {
+  if (period === "today") {
+    return { current: formatShortDate(currentEnd), previous: formatShortDate(previousEnd) };
+  }
+
+  if (period === "1m") {
+    return { current: "This month", previous: "Last month" };
+  }
+
+  if (period === "1y") {
+    return { current: "This Year", previous: "Last Year" };
+  }
+
+  return {
+    current: formatRangeLabel(currentStart, currentEnd),
+    previous: formatRangeLabel(previousStart, previousEnd),
+  };
+}
+
+export function niceAxis(maxValue) {
+  if (maxValue <= 5) return { max: 5, ticks: [0, 1, 2, 3, 4, 5] };
+  if (maxValue <= 10) return { max: 10, ticks: [0, 2, 4, 6, 8, 10] };
+
+  const rawStep = maxValue / 4;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const candidates = [1, 2, 2.5, 5, 10].map((candidate) => candidate * magnitude);
+  const step = candidates.find((candidate) => maxValue / candidate <= 5) ?? candidates[candidates.length - 1];
+  const max = Math.ceil(maxValue / step) * step;
+  const ticks = [];
+  for (let value = 0; value <= max; value += step) ticks.push(value);
+  return { max, ticks };
+}
+
+export function computeDelta(current, previous) {
+  if (previous === 0 && current === 0) {
+    return { pct: 0, direction: "flat", label: "0%" };
+  }
+  if (previous === 0) {
+    return { pct: null, direction: "up", label: "New" };
+  }
+
+  const raw = ((current - previous) / previous) * 100;
+  const rounded = Math.round(raw);
+  if (rounded > 999) {
+    return { pct: 999, direction: "up", label: ">999%" };
+  }
+  if (rounded < -999) {
+    return { pct: -999, direction: "down", label: "<-999%" };
+  }
+  if (rounded === 0) {
+    return { pct: 0, direction: "flat", label: "0%" };
+  }
+
+  return {
+    pct: rounded,
+    direction: rounded > 0 ? "up" : "down",
+    label: `${rounded > 0 ? "+" : ""}${rounded}%`,
   };
 }
 
@@ -286,31 +362,27 @@ export function buildDashboard(period, compare, ownerEmail = "", projects = PROJ
       }
     : null;
 
-  const delta = (current, previous) => {
-    if (!compare || !previous || previous === 0) return null;
-    const raw = ((current - previous) / previous) * 100;
-    return Math.round(raw * 10) / 10;
-  };
-
   const lineSeries = currentSeries.buckets.map((bucket) => bucket.created);
   const compareLineSeries = previousSeries?.buckets.map((bucket) => bucket.created) ?? [];
   const barSeries = currentSeries.buckets.map((bucket) => bucket.products);
   const compareBarSeries = previousSeries?.buckets.map((bucket) => bucket.products) ?? [];
-
-  const legend = config.mode === "hour"
-    ? ["Today", "Yesterday"]
-    : config.mode === "month"
-      ? ["This Year", "Last Year"]
-      : ["Current", "Previous"];
+  const comparisonLabels = describeComparisonLabels(period, currentStart, end, previousStart, previousEnd);
+  const periodPreviousStart = previousStart;
+  const periodPreviousEnd = previousEnd;
 
   return {
     period: config.label,
     compare,
+    ranges: {
+      current: { start: currentStart, end },
+      previous: { start: periodPreviousStart, end: periodPreviousEnd },
+      labels: comparisonLabels,
+    },
     cards: [
       {
         title: "Projects created",
         value: totals.created.toLocaleString("en-US"),
-        delta: delta(totals.created, previousTotals?.created),
+        delta: compare ? computeDelta(totals.created, previousTotals?.created ?? 0) : null,
         caption: config.mode === "month" ? "New projects this year" : "New projects this period",
         accent: "green",
         sparkline: lineSeries,
@@ -318,7 +390,7 @@ export function buildDashboard(period, compare, ownerEmail = "", projects = PROJ
       {
         title: "Products placed",
         value: totals.products.toLocaleString("en-US"),
-        delta: delta(totals.products, previousTotals?.products),
+        delta: compare ? computeDelta(totals.products, previousTotals?.products ?? 0) : null,
         caption: "Items added across all scenes",
         accent: "green",
         sparkline: barSeries,
@@ -326,7 +398,7 @@ export function buildDashboard(period, compare, ownerEmail = "", projects = PROJ
       {
         title: "Actions on items",
         value: totals.actions.toLocaleString("en-US"),
-        delta: delta(totals.actions, previousTotals?.actions),
+        delta: compare ? computeDelta(totals.actions, previousTotals?.actions ?? 0) : null,
         caption: "Moves, rotations, edits",
         accent: "red",
         sparkline: currentSeries.buckets.map((bucket) => bucket.actions),
@@ -334,7 +406,7 @@ export function buildDashboard(period, compare, ownerEmail = "", projects = PROJ
       {
         title: "Active projects",
         value: totals.active.toLocaleString("en-US"),
-        delta: delta(totals.active, previousTotals?.active),
+        delta: compare ? computeDelta(totals.active, previousTotals?.active ?? 0) : null,
         caption: `${totals.active.toLocaleString("en-US")} active, ${totals.deleted.toLocaleString("en-US")} deleted`,
         accent: "red",
         sparkline: currentSeries.buckets.map((bucket) => bucket.active),
@@ -342,7 +414,7 @@ export function buildDashboard(period, compare, ownerEmail = "", projects = PROJ
       {
         title: "Project budget",
         value: `$${totals.budget.toLocaleString("en-US")}`,
-        delta: delta(totals.budget, previousTotals?.budget),
+        delta: compare ? computeDelta(totals.budget, previousTotals?.budget ?? 0) : null,
         caption: "Total spent this period",
         accent: "green",
         sparkline: currentSeries.buckets.map((bucket) => bucket.budget),
@@ -353,10 +425,12 @@ export function buildDashboard(period, compare, ownerEmail = "", projects = PROJ
         value: totals.created.toLocaleString("en-US"),
         title: "Projects created",
         subtitle: config.mode === "hour" ? "Each point is one hour" : config.mode === "month" ? "Each point is one month" : "Each point is one day",
-        legend,
+        delta: compare ? computeDelta(totals.created, previousTotals?.created ?? 0) : null,
+        legend: [comparisonLabels.current, comparisonLabels.previous],
         labels: currentSeries.labels,
         series: lineSeries,
         compareSeries: compareLineSeries,
+        maxValue: Math.max(...lineSeries, ...(compare ? compareLineSeries : []), 0),
       },
       right: {
         value: totals.products.toLocaleString("en-US"),
@@ -367,10 +441,17 @@ export function buildDashboard(period, compare, ownerEmail = "", projects = PROJ
             : config.mode === "month"
               ? "Every month shown, including months with none placed"
               : "Every day shown, including days with none placed",
-        legend,
+        delta: compare ? computeDelta(totals.products, previousTotals?.products ?? 0) : null,
+        legend: [comparisonLabels.current, comparisonLabels.previous],
         labels: currentSeries.labels,
         series: barSeries,
         compareSeries: compareBarSeries,
+        merged: currentSeries.labels.map((label, index) => ({
+          label,
+          current: barSeries[index] ?? 0,
+          previous: compareBarSeries[index] ?? 0,
+        })),
+        maxValue: Math.max(...barSeries, ...(compare ? compareBarSeries : []), 0),
       },
     },
   };

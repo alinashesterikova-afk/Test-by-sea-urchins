@@ -233,12 +233,17 @@ button {
   font-size: 12px;
   line-height: 1;
   letter-spacing: -0.01em;
+  outline: none;
 }
 
 .period-chip.active {
   background: #eef1ef;
   color: #1f2521;
   border-color: #d9dedb;
+}
+
+.period-chip:focus-visible {
+  box-shadow: 0 0 0 2px rgba(31, 36, 33, 0.08);
 }
 
 .metrics-grid {
@@ -312,18 +317,34 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 15px;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
   line-height: 1;
   font-weight: 600;
   white-space: nowrap;
 }
 
 .metric-delta.up {
-  color: #20a345;
+  color: #15803d;
+  background: #e8f8ed;
 }
 
 .metric-delta.down {
-  color: #e04b56;
+  color: #c43d51;
+  background: #fdebef;
+}
+
+.metric-delta.flat,
+.metric-delta.new {
+  color: #66706a;
+  background: #eef0ee;
+}
+
+.delta-flat-mark {
+  font-size: 13px;
+  line-height: 1;
 }
 
 .metric-caption {
@@ -357,8 +378,20 @@ button {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  min-height: 56px;
+  min-height: 80px;
   margin-bottom: 6px;
+}
+
+.chart-heading {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.chart-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .chart-kicker {
@@ -367,15 +400,29 @@ button {
   font-weight: 700;
   letter-spacing: -0.04em;
   color: #3b403c;
+  white-space: nowrap;
 }
 
 .chart-title {
-  display: inline-block;
-  margin-left: 8px;
   font-size: 14px;
   line-height: 1.2;
-  font-weight: 600;
+  font-weight: 500;
   color: #3a403c;
+  white-space: nowrap;
+}
+
+.chart-title-wrap {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chart-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 22px;
 }
 
 .chart-subtitle {
@@ -394,6 +441,7 @@ button {
   gap: 8px;
   color: #7d8480;
   margin-top: 0;
+  flex: 0 0 auto;
 }
 
 .toggle {
@@ -431,9 +479,13 @@ button {
   gap: 18px;
   align-items: center;
   flex-wrap: wrap;
-  margin: 4px 0 8px;
+  margin: 6px 0 2px;
   color: #727a75;
   font-size: 12px;
+}
+
+.chart-legend[hidden] {
+  display: none;
 }
 
 .legend-item {
@@ -486,6 +538,26 @@ button {
   margin: 0 6px;
 }
 
+.table-heading {
+  padding: 22px 18px 10px;
+}
+
+.table-heading h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.table-heading p {
+  margin: 2px 0 0;
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
 .error-banner {
   display: flex;
   align-items: center;
@@ -505,6 +577,19 @@ button {
   color: #842033;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.analytics-error {
+  margin: 0 6px 8px;
+}
+
+.table-error-row td {
+  padding: 0;
+}
+
+.table-error {
+  border-bottom: 0;
+  border-radius: 0;
 }
 
 .toolbar {

@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Project details</title>
-    <link rel="stylesheet" href="./styles.css?v=3" />
+    <title>Usage Statistics</title>
+    <link rel="stylesheet" href="./styles.css?v=4" />
   </head>
   <body>
     <div class="app-shell">
@@ -25,7 +25,7 @@
 
       <main class="page-shell">
         <section class="page-header">
-          <h1>Project details</h1>
+          <h1>Usage Statistics</h1>
           <p class="subtitle">Every project, who made it, and how it's being used</p>
         </section>
 
@@ -63,24 +63,34 @@
           <button class="period-chip" data-period="1m" type="button">1 M</button>
           <button class="period-chip active" data-period="1y" type="button">1 Y</button>
         </div>
-      </section>
+        </section>
+
+        <div id="analyticsErrorBanner" class="error-banner analytics-error" hidden>
+          <span>Couldn't load analytics.</span>
+          <button id="retryAnalyticsButton" type="button">Retry</button>
+        </div>
 
         <section class="metrics-grid" id="metricsGrid" aria-label="Overview cards"></section>
 
         <section class="chart-grid" aria-label="Overview charts">
           <article class="chart-card">
             <header class="chart-header">
-              <div>
-                <div class="chart-kicker" id="leftChartValue">345k</div>
-                <div class="chart-title" id="leftChartTitle">Projects created</div>
+              <div class="chart-heading">
+                <div class="chart-title-row">
+                  <div class="chart-kicker" id="leftChartValue">345k</div>
+                  <div class="chart-title-wrap">
+                    <div class="chart-title" id="leftChartTitle">Projects created</div>
+                    <div class="chart-delta" id="leftChartDelta"></div>
+                  </div>
+                </div>
                 <div class="chart-subtitle" id="leftChartSubtitle">Each point is one month</div>
+                <div class="chart-legend" id="leftLegend" hidden></div>
               </div>
               <button class="compare-control" id="leftCompareControl" type="button">
                 <span>Compare</span>
                 <span class="toggle" id="leftCompareToggle" aria-hidden="true"></span>
               </button>
             </header>
-            <div class="chart-legend" id="leftLegend"></div>
             <div class="chart-body">
               <svg id="leftChartSvg" viewBox="0 0 560 260" role="img" aria-label="Projects created chart"></svg>
             </div>
@@ -88,17 +98,22 @@
 
           <article class="chart-card">
             <header class="chart-header">
-              <div>
-                <div class="chart-kicker" id="rightChartValue">345k</div>
-                <div class="chart-title" id="rightChartTitle">Products placed today</div>
+              <div class="chart-heading">
+                <div class="chart-title-row">
+                  <div class="chart-kicker" id="rightChartValue">345k</div>
+                  <div class="chart-title-wrap">
+                    <div class="chart-title" id="rightChartTitle">Products placed today</div>
+                    <div class="chart-delta" id="rightChartDelta"></div>
+                  </div>
+                </div>
                 <div class="chart-subtitle" id="rightChartSubtitle">Every hour shown, including hours with none placed</div>
+                <div class="chart-legend" id="rightLegend" hidden></div>
               </div>
               <button class="compare-control" id="rightCompareControl" type="button">
                 <span>Compare</span>
                 <span class="toggle" id="rightCompareToggle" aria-hidden="true"></span>
               </button>
             </header>
-            <div class="chart-legend" id="rightLegend"></div>
             <div class="chart-body">
               <svg id="rightChartSvg" viewBox="0 0 560 260" role="img" aria-label="Products placed chart"></svg>
             </div>
@@ -106,9 +121,9 @@
         </section>
 
         <section class="table-panel" aria-label="Project analytics table">
-          <div id="errorBanner" class="error-banner" hidden>
-            <span>Couldn't load projects.</span>
-            <button id="retryButton" type="button">Retry</button>
+          <div class="table-heading">
+            <h2>Project details</h2>
+            <p>Every project, who made it, and how it's being used</p>
           </div>
 
           <div class="toolbar">
@@ -202,6 +217,6 @@
       </form>
     </dialog>
 
-    <script type="module" src="./app.js?v=3"></script>
+    <script type="module" src="./app.js?v=4"></script>
   </body>
 </html>
