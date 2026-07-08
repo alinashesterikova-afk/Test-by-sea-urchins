@@ -31,7 +31,7 @@ body {
   margin: 0;
   font-family: "Open Sans", "Segoe UI", Arial, sans-serif;
   color: var(--text);
-  background: #f2f2f2;
+  background: var(--bg);
 }
 
 button,
@@ -140,7 +140,7 @@ button {
 .page-shell {
   width: auto;
   margin: 0;
-  padding: 30px 48px 36px;
+  padding: 30px 34px 36px;
 }
 
 .page-header {
@@ -165,7 +165,7 @@ button {
 
 .filter-strip {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 12px 20px;
   padding: 0 6px 18px;
@@ -257,8 +257,27 @@ button {
   letter-spacing: -0.01em;
 }
 
+.chart-search-wrap {
+  position: relative;
+  width: 280px;
+}
+
+.search-field--compact {
+  height: 40px;
+  padding: 0 14px;
+}
+
+.table-date-wrap {
+  position: relative;
+  width: 230px;
+}
+
+.table-date-filter {
+  width: 100%;
+}
+
 .date-picker {
-  position: absolute;
+  position: fixed;
   top: calc(100% + 10px);
   left: 0;
   z-index: 40;
@@ -562,16 +581,16 @@ button {
 .chart-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  padding: 12px 6px 14px;
+  gap: 16px;
+  padding: 12px 0 14px;
 }
 
 .chart-card {
-  min-height: 264px;
+  min-height: 286px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: #fff;
-  padding: 10px 20px 14px;
+  padding: 10px 16px 14px;
 }
 
 .chart-header {
@@ -729,7 +748,7 @@ button {
 }
 
 .chart-body {
-  height: 198px;
+  height: 220px;
 }
 
 .chart-body svg {
@@ -749,13 +768,12 @@ button {
 }
 
 .table-panel {
-  background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(10px);
+  background: #fff;
   border: 1px solid rgba(216, 221, 217, 0.95);
   border-radius: 20px;
   box-shadow: var(--shadow);
   overflow: hidden;
-  margin: 0 6px;
+  margin: 0;
 }
 
 .table-heading {
@@ -818,6 +836,7 @@ button {
   justify-content: space-between;
   gap: 14px;
   padding: 18px 18px 14px;
+  flex-wrap: wrap;
 }
 
 .search-wrap {
@@ -1336,6 +1355,13 @@ tbody tr:hover {
   padding: 84px 24px 92px;
   text-align: center;
   color: var(--text-soft);
+}
+
+.empty-actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
 .empty-state strong {

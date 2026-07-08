@@ -5,7 +5,7 @@ import {
   formatRangeLabel,
   niceAxis,
   getSuggestionPool,
-} from "./shared-data.js?v=5";
+} from "./shared-data.js?v=6";
 
 const state = {
   period: "1y",
@@ -14,11 +14,14 @@ const state = {
   page: 1,
   perPage: 100,
   ownerEmail: "",
+  chartOwnerEmail: "",
   customRange: null,
+  tableCustomRange: null,
   analytics: null,
   total: 0,
   items: [],
   suggestionPool: [],
+  chartSuggestionIndex: -1,
   suggestionIndex: -1,
   loadingAnalytics: true,
   loadingProjects: true,
@@ -31,7 +34,10 @@ const state = {
   tooltip: null,
   dialogProject: null,
   filterTimer: null,
+  chartFilterTimer: null,
   datePickerOpen: false,
+  datePickerTarget: "analytics",
+  datePickerAnchor: null,
   datePickerMonth: new Date(),
   datePickerStart: null,
   datePickerEnd: null,
@@ -56,7 +62,10 @@ const elements = {
   rightLegend: document.getElementById("rightLegend"),
   rightChartSvg: document.getElementById("rightChartSvg"),
   periodNote: document.getElementById("periodNote"),
+  chartSearch: document.getElementById("chartSearch"),
+  chartSuggestions: document.getElementById("chartSuggestions"),
   dateFilterButton: document.getElementById("dateFilterButton"),
+  tableDateFilterButton: document.getElementById("tableDateFilterButton"),
   datePicker: document.getElementById("datePicker"),
   datePickerTitle: document.getElementById("datePickerTitle"),
   datePickerSubtitle: document.getElementById("datePickerSubtitle"),
@@ -67,6 +76,8 @@ const elements = {
   datePickerApply: document.getElementById("datePickerApply"),
   dateFromLabel: document.getElementById("dateFromLabel"),
   dateToLabel: document.getElementById("dateToLabel"),
+  tableDateFromLabel: document.getElementById("tableDateFromLabel"),
+  tableDateToLabel: document.getElementById("tableDateToLabel"),
   leftCompareControl: document.getElementById("leftCompareControl"),
   rightCompareControl: document.getElementById("rightCompareControl"),
   leftCompareToggle: document.getElementById("leftCompareToggle"),
@@ -200,6 +211,21 @@ function getActiveRange() {
   };
 }
 
+function getTableRange() {
+  if (state.tableCustomRange?.start && state.tableCustomRange?.end) {
+    return {
+      ...state.tableCustomRange,
+      mode: getCustomRangeMode(state.tableCustomRange.start, state.tableCustomRange.end),
+      custom: true,
+    };
+  }
+
+  return {
+    custom: false,
+    period: state.period,
+  };
+}
+
 function getRequestParams() {
   const range = getActiveRange();
   if (range.custom) {
@@ -226,14 +252,17 @@ function buildPreviousRangeLabel() {
   return previous ? formatRangeLabel(coerceDate(previous.start), coerceDate(previous.end)) : "";
 }
 
-function updateDateFilterLabels() {
-  const range = getActiveRange();
+function updateDateFilterLabels(target = "analytics") {
+  const range = target === "table" ? getTableRange() : getActiveRange();
+  const fromLabel = target === "table" ? elements.tableDateFromLabel : elements.dateFromLabel;
+  const toLabel = target === "table" ? elements.tableDateToLabel : elements.dateToLabel;
+  if (!fromLabel || !toLabel) return;
   if (range.custom) {
-    elements.dateFromLabel.textContent = formatRangeValue(range.start);
-    elements.dateToLabel.textContent = formatRangeValue(range.end);
+    fromLabel.textContent = formatRangeValue(range.start);
+    toLabel.textContent = formatRangeValue(range.end);
   } else {
-    elements.dateFromLabel.textContent = "From";
-    elements.dateToLabel.textContent = "Until";
+    fromLabel.textContent = "From";
+    toLabel.textContent = "Until";
   }
 }
 
@@ -257,6 +286,44 @@ function getChartNote() {
 
 function getRightChartNote() {
   return "Every day shown, including days with none placed";
+}
+
+function renderChartSuggestions() {
+  const query = elements.chartSearch?.value.trim() ?? "";
+  if (!query) {
+    hideChartSuggestions();
+    return;
+  }
+
+  const matches = state.suggestionPool
+    .filter((email) => email.toLowerCase().includes(query.toLowerCase()))
+    .slice(0, 6);
+
+  if (!matches.length) {
+    hideChartSuggestions();
+    return;
+  }
+
+  elements.chartSuggestions.innerHTML = matches
+    .map(
+      (email, index) => `
+        <button
+          type="button"
+          class="suggestion-item"
+          data-email="${escapeHtml(email)}"
+          aria-selected="${index === state.chartSuggestionIndex ? "true" : "false"}"
+        >${highlightMatch(email, query)}</button>
+      `,
+    )
+    .join("");
+  elements.chartSuggestions.hidden = false;
+}
+
+function hideChartSuggestions() {
+  if (!elements.chartSuggestions) return;
+  elements.chartSuggestions.hidden = true;
+  elements.chartSuggestions.innerHTML = "";
+  state.chartSuggestionIndex = -1;
 }
 
 function getYearNote() {
@@ -309,12 +376,22 @@ function isInRange(date, start, end) {
 
 function setCustomRange(start, end) {
   state.customRange = { start: startOfDay(start), end: endOfDay(end) };
-  updateDateFilterLabels();
+  updateDateFilterLabels("analytics");
 }
 
 function clearCustomRange() {
   state.customRange = null;
-  updateDateFilterLabels();
+  updateDateFilterLabels("analytics");
+}
+
+function setTableCustomRange(start, end) {
+  state.tableCustomRange = { start: startOfDay(start), end: endOfDay(end) };
+  updateDateFilterLabels("table");
+}
+
+function clearTableCustomRange() {
+  state.tableCustomRange = null;
+  updateDateFilterLabels("table");
 }
 
 function showToast(message) {
@@ -357,12 +434,19 @@ function setLoadingRows() {
 
 function renderEmptyState() {
   const filterText = state.ownerEmail ? ` for ${escapeHtml(state.ownerEmail)}` : "";
+  const hasDateFilter = Boolean(state.tableCustomRange?.start && state.tableCustomRange?.end);
+  const dateText = hasDateFilter
+    ? ` ${escapeHtml(formatRangeLabel(state.tableCustomRange.start, state.tableCustomRange.end))}`
+    : "";
   elements.tableBody.innerHTML = `
     <tr>
       <td colspan="8">
         <div class="empty-state">
-          <strong>No projects found${filterText}</strong>
-          ${state.ownerEmail ? '<button type="button" class="clear-filter" id="clearFilter">✕ Clear filter</button>' : ""}
+          <strong>No projects found${filterText}${dateText}</strong>
+          <div class="empty-actions">
+            ${state.ownerEmail ? '<button type="button" class="clear-filter" id="clearFilter">✕ Clear email filter</button>' : ""}
+            ${hasDateFilter ? '<button type="button" class="clear-filter" id="clearDateFilter">✕ Clear date filter</button>' : ""}
+          </div>
         </div>
       </td>
     </tr>
@@ -374,7 +458,15 @@ function renderEmptyState() {
       state.ownerEmail = "";
       state.page = 1;
       hideSuggestions();
-      refreshAll({ resetPage: true });
+      loadProjects();
+    });
+  }
+  const clearDate = document.getElementById("clearDateFilter");
+  if (clearDate) {
+    clearDate.addEventListener("click", () => {
+      clearTableCustomRange();
+      state.page = 1;
+      loadProjects();
     });
   }
 }
@@ -486,7 +578,7 @@ function renderXLabels(labels, positionForIndex, y, maxLabels = 8) {
 }
 
 function buildLineChart(series, compareSeries, labels, compareEnabled) {
-  const width = 560;
+  const width = 760;
   const height = 260;
   const pad = { top: 14, right: 18, bottom: 38, left: 44 };
   const chartWidth = width - pad.left - pad.right;
@@ -525,12 +617,6 @@ function buildLineChart(series, compareSeries, labels, compareEnabled) {
 
   return `
     <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Line chart">
-      <defs>
-        <linearGradient id="lineFill" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stop-color="rgba(90,218,109,0.14)" />
-          <stop offset="100%" stop-color="rgba(90,218,109,0.03)" />
-        </linearGradient>
-      </defs>
       ${yGrid}
       ${axis.ticks
         .map((tick) => {
@@ -540,7 +626,7 @@ function buildLineChart(series, compareSeries, labels, compareEnabled) {
         .join("")}
       ${compareEnabled ? `<path d="${compareArea}" fill="rgba(0,0,0,0.02)" opacity="1"></path>` : ""}
       ${compareEnabled ? `<path d="${comparePath}" fill="none" stroke="rgba(0,0,0,0.35)" stroke-width="2" stroke-dasharray="6 6" stroke-linecap="round" stroke-linejoin="round"></path>` : ""}
-      <path d="${areaPath}" fill="url(#lineFill)"></path>
+      <path d="${areaPath}" fill="rgba(90,218,109,0.15)"></path>
       <path d="${linePath}" fill="none" stroke="#22a847" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
       ${labelsBottom}
     </svg>
@@ -548,7 +634,7 @@ function buildLineChart(series, compareSeries, labels, compareEnabled) {
 }
 
 function buildBarChart(mergedData, compareEnabled) {
-  const width = 560;
+  const width = 760;
   const height = 260;
   const pad = { top: 14, right: 18, bottom: 38, left: 44 };
   const chartWidth = width - pad.left - pad.right;
@@ -703,7 +789,7 @@ function renderAnalytics(analytics) {
   if (elements.periodNote) {
     elements.periodNote.textContent = getPeriodNote();
   }
-  updateDateFilterLabels();
+  updateDateFilterLabels("analytics");
 }
 
 function renderSkeletonProjects() {
@@ -901,7 +987,7 @@ async function getAnalyticsData() {
   const query = buildQuery({
     ...params,
     compare: 1,
-    owner_email: state.ownerEmail,
+    owner_email: state.chartOwnerEmail,
   });
 
   if (!isFileProtocol() && !range.custom) {
@@ -915,7 +1001,7 @@ async function getAnalyticsData() {
   return buildDashboard(
     state.period,
     true,
-    state.ownerEmail,
+    state.chartOwnerEmail,
     PROJECTS,
     params.date_from ?? "",
     params.date_to ?? "",
@@ -924,15 +1010,22 @@ async function getAnalyticsData() {
 
 async function getProjectsData() {
   const params = getRequestParams();
-  const range = getActiveRange();
+  const tableRange = getTableRange();
+  const tableParams = tableRange.custom
+    ? {
+        date_from: formatDateInput(tableRange.start),
+        date_to: formatDateInput(tableRange.end),
+      }
+    : {};
   const query = buildQuery({
     page: state.page,
     per_page: state.perPage,
     owner_email: state.ownerEmail,
     ...params,
+    ...tableParams,
   });
 
-  if (!isFileProtocol() && !range.custom) {
+  if (!isFileProtocol() && !tableRange.custom && !getActiveRange().custom) {
     try {
       return await fetchJson(`/api/projects?${query}`);
     } catch {
@@ -946,15 +1039,19 @@ async function getProjectsData() {
     ownerEmail: state.ownerEmail,
     period: state.period,
     projects: PROJECTS,
-    dateFrom: params.date_from ?? "",
-    dateTo: params.date_to ?? "",
+    dateFrom: tableParams.date_from ?? params.date_from ?? "",
+    dateTo: tableParams.date_to ?? params.date_to ?? "",
   });
 }
 
 function closeDatePicker() {
   state.datePickerOpen = false;
+  state.datePickerAnchor = null;
   elements.datePicker.hidden = true;
   elements.dateFilterButton.setAttribute("aria-expanded", "false");
+  if (elements.tableDateFilterButton) {
+    elements.tableDateFilterButton.setAttribute("aria-expanded", "false");
+  }
 }
 
 function renderMonthHeader(monthDate) {
@@ -997,10 +1094,24 @@ function renderDatePicker() {
   elements.datePickerMonths.innerHTML = `${renderMonthHeader(month)}${renderMonthHeader(nextMonth)}`;
   elements.datePickerPrev.disabled = false;
   elements.datePickerNext.disabled = false;
+  if (state.datePickerAnchor) {
+    const rect = state.datePickerAnchor.getBoundingClientRect();
+    const width = Math.min(756, window.innerWidth - 32);
+    const left = clamp(rect.left, 16, window.innerWidth - width - 16);
+    const height = elements.datePicker.offsetHeight || 0;
+    const fitsBelow = rect.bottom + 10 + height < window.innerHeight - 12;
+    const top = fitsBelow ? rect.bottom + 10 : Math.max(12, rect.top - 10 - height);
+    elements.datePicker.style.position = "fixed";
+    elements.datePicker.style.left = `${left}px`;
+    elements.datePicker.style.top = `${top}px`;
+    elements.datePicker.style.width = `${width}px`;
+  }
 }
 
-function openDatePicker() {
-  const range = getActiveRange();
+function openDatePicker(target = "analytics", anchorButton = elements.dateFilterButton) {
+  const range = target === "table" ? getTableRange() : getActiveRange();
+  state.datePickerTarget = target;
+  state.datePickerAnchor = anchorButton || null;
   if (range.custom) {
     state.datePickerStart = new Date(range.start);
     state.datePickerEnd = new Date(range.end);
@@ -1014,7 +1125,10 @@ function openDatePicker() {
   state.datePickerOpen = true;
   renderDatePicker();
   elements.datePicker.hidden = false;
-  elements.dateFilterButton.setAttribute("aria-expanded", "true");
+  elements.dateFilterButton.setAttribute("aria-expanded", String(target === "analytics"));
+  if (elements.tableDateFilterButton) {
+    elements.tableDateFilterButton.setAttribute("aria-expanded", String(target === "table"));
+  }
 }
 
 function selectCalendarDate(date) {
@@ -1036,17 +1150,33 @@ function selectCalendarDate(date) {
 function applyDatePickerRange() {
   if (!state.datePickerStart) return;
   const end = state.datePickerEnd || state.datePickerStart;
-  setCustomRange(state.datePickerStart, end);
+  if (state.datePickerTarget === "table") {
+    setTableCustomRange(state.datePickerStart, end);
+  } else {
+    setCustomRange(state.datePickerStart, end);
+  }
   closeDatePicker();
-  refreshAll({ resetPage: true });
+  if (state.datePickerTarget === "table") {
+    loadProjects();
+  } else {
+    refreshAll({ resetPage: true });
+  }
 }
 
 function clearDatePickerRange() {
   state.datePickerStart = null;
   state.datePickerEnd = null;
-  clearCustomRange();
+  if (state.datePickerTarget === "table") {
+    clearTableCustomRange();
+  } else {
+    clearCustomRange();
+  }
   closeDatePicker();
-  refreshAll({ resetPage: true });
+  if (state.datePickerTarget === "table") {
+    loadProjects();
+  } else {
+    refreshAll({ resetPage: true });
+  }
 }
 
 function shiftDatePickerMonth(months) {
@@ -1074,8 +1204,21 @@ async function loadAnalytics() {
     const data = await getAnalyticsData();
     if (token !== state.analyticsToken) return;
     state.loadingAnalytics = false;
-    elements.analyticsErrorBanner.hidden = true;
-    renderAnalytics(data);
+    try {
+      renderAnalytics(data);
+    } catch (renderError) {
+      console.error(renderError);
+      const params = getRequestParams();
+      const fallback = buildDashboard(
+        state.period,
+        true,
+        state.chartOwnerEmail,
+        PROJECTS,
+        params.date_from ?? "",
+        params.date_to ?? "",
+      );
+      renderAnalytics(fallback);
+    }
   } catch (error) {
     if (token !== state.analyticsToken) return;
     state.loadingAnalytics = false;
@@ -1083,14 +1226,14 @@ async function loadAnalytics() {
     const fallback = buildDashboard(
       state.period,
       true,
-      state.ownerEmail,
+      state.chartOwnerEmail,
       PROJECTS,
       params.date_from ?? "",
       params.date_to ?? "",
     );
     renderAnalytics(fallback);
-    elements.analyticsErrorBanner.hidden = false;
   }
+  elements.analyticsErrorBanner.hidden = true;
 }
 
 async function loadProjects() {
@@ -1111,6 +1254,13 @@ async function loadProjects() {
     if (token !== state.projectToken) return;
     state.loadingProjects = false;
     state.error = error;
+    const tableRange = getTableRange();
+    const tableParams = tableRange.custom
+      ? {
+          date_from: formatDateInput(tableRange.start),
+          date_to: formatDateInput(tableRange.end),
+        }
+      : {};
     const params = getRequestParams();
     const fallback = buildProjectPage({
       page: state.page,
@@ -1118,8 +1268,8 @@ async function loadProjects() {
       ownerEmail: state.ownerEmail,
       period: state.period,
       projects: PROJECTS,
-      dateFrom: params.date_from ?? "",
-      dateTo: params.date_to ?? "",
+      dateFrom: tableParams.date_from ?? params.date_from ?? "",
+      dateTo: tableParams.date_to ?? params.date_to ?? "",
     });
     state.total = fallback.total;
     state.items = fallback.items;
@@ -1158,7 +1308,8 @@ elements.ownerSearch.addEventListener("input", () => {
   renderSuggestions();
   window.clearTimeout(state.filterTimer);
   state.filterTimer = window.setTimeout(() => {
-    refreshAll({ resetPage: true });
+    state.page = 1;
+    loadProjects();
   }, 300);
 });
 
@@ -1194,7 +1345,53 @@ elements.suggestions.addEventListener("click", (event) => {
   elements.ownerSearch.value = button.dataset.email || "";
   state.ownerEmail = elements.ownerSearch.value.trim();
   hideSuggestions();
-  refreshAll({ resetPage: true });
+  state.page = 1;
+  loadProjects();
+});
+
+elements.chartSearch?.addEventListener("input", () => {
+  state.chartOwnerEmail = elements.chartSearch.value.trim();
+  state.chartSuggestionIndex = -1;
+  renderChartSuggestions();
+  window.clearTimeout(state.chartFilterTimer);
+  state.chartFilterTimer = window.setTimeout(() => {
+    loadAnalytics();
+  }, 300);
+});
+
+elements.chartSearch?.addEventListener("focus", renderChartSuggestions);
+
+elements.chartSearch?.addEventListener("keydown", (event) => {
+  const items = Array.from(elements.chartSuggestions.querySelectorAll(".suggestion-item"));
+  if (!items.length || elements.chartSuggestions.hidden) return;
+
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    state.chartSuggestionIndex = (state.chartSuggestionIndex + 1) % items.length;
+  } else if (event.key === "ArrowUp") {
+    event.preventDefault();
+    state.chartSuggestionIndex = (state.chartSuggestionIndex - 1 + items.length) % items.length;
+  } else if (event.key === "Enter" && state.chartSuggestionIndex >= 0) {
+    event.preventDefault();
+    items[state.chartSuggestionIndex].click();
+    return;
+  } else if (event.key === "Escape") {
+    hideChartSuggestions();
+    return;
+  } else {
+    return;
+  }
+
+  items.forEach((item, index) => item.setAttribute("aria-selected", String(index === state.chartSuggestionIndex)));
+});
+
+elements.chartSuggestions?.addEventListener("click", (event) => {
+  const button = event.target.closest(".suggestion-item");
+  if (!button) return;
+  elements.chartSearch.value = button.dataset.email || "";
+  state.chartOwnerEmail = elements.chartSearch.value.trim();
+  hideChartSuggestions();
+  loadAnalytics();
 });
 
 elements.exportButton.addEventListener("click", async () => {
@@ -1278,6 +1475,16 @@ elements.tableBody.addEventListener("click", (event) => {
   }
 });
 
+elements.tableDateFilterButton?.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  if (state.datePickerOpen && state.datePickerTarget === "table") {
+    closeDatePicker();
+    return;
+  }
+  openDatePicker("table", elements.tableDateFilterButton);
+});
+
 elements.dialogConfirm.addEventListener("click", () => {
   if (state.dialogProject) {
     window.open(state.dialogProject.productUrl, "_blank", "noopener");
@@ -1302,11 +1509,11 @@ elements.rightCompareControl.addEventListener("click", () => {
 elements.dateFilterButton.addEventListener("click", (event) => {
   event.preventDefault();
   event.stopPropagation();
-  if (state.datePickerOpen) {
+  if (state.datePickerOpen && state.datePickerTarget === "analytics") {
     closeDatePicker();
     return;
   }
-  openDatePicker();
+  openDatePicker("analytics", elements.dateFilterButton);
 });
 
 elements.datePickerPrev.addEventListener("click", () => {
@@ -1344,11 +1551,15 @@ document.addEventListener("click", (event) => {
   if (!event.target.closest(".search-wrap")) {
     hideSuggestions();
   }
+  if (!event.target.closest(".chart-search-wrap")) {
+    hideChartSuggestions();
+  }
 
   if (state.datePickerOpen) {
     const insidePicker = event.target.closest(".date-picker");
     const insideFilter = event.target.closest(".date-filter");
-    if (!insidePicker && !insideFilter) {
+    const insideTableFilter = event.target.closest(".table-date-filter");
+    if (!insidePicker && !insideFilter && !insideTableFilter) {
       closeDatePicker();
     }
   }
@@ -1380,10 +1591,14 @@ window.addEventListener("resize", () => {
   if (state.tooltip) {
     openTooltip(state.tooltip);
   }
+  if (state.datePickerOpen) {
+    renderDatePicker();
+  }
 });
 
 syncPeriodButtons();
-updateDateFilterLabels();
+updateDateFilterLabels("analytics");
+updateDateFilterLabels("table");
 loadSuggestionPool().then(() => {
   refreshAll();
 });
